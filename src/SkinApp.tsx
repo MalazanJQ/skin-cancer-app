@@ -18,15 +18,6 @@ export default function SkinApp() {
     }
   }
 
-  useEffect(() => {
-    if (preview) {
-      setButton(<button className="btn btn-secondary mt-4" onClick={predictImage}>Predict</button>);
-      setPredict(null)
-    } else {
-      setButton(<div></div>);
-    }
-  }, [preview]);
-
   const predictImage = async () => {
     setButton(<div></div>);
     setPredict(<p className="mt-4">Loading model prediction...</p>);
@@ -52,7 +43,15 @@ export default function SkinApp() {
     }
   }
 
-  /** Renders the correct page */
+  useEffect(() => {
+    if (preview) {
+      setButton(<button className="btn btn-secondary mt-4" onClick={predictImage}>Predict</button>);
+      setPredict(null)
+    } else {
+      setButton(<div></div>);
+    }
+  }, [preview, predictImage]);
+
   return (
     <div className="container mt-4">
       <h2 className="mb-4">Machine Learning Model to Classify Skin Cancer</h2>
