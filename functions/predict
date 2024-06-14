@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify
 import cv2
 import numpy as np
-import onnxruntime as rt
+import pickle
+import torch
 from flask_cors import CORS
+import torch.nn.functional as F
 
 HEIGHT = 300
 WIDTH = 300
@@ -12,35 +14,37 @@ STD_DEV = np.array([57.58242606, 53.78604796, 55.97474568])
 app = Flask(__name__)
 CORS(app)
 
-model_path = "./model_c.onnx"
-session = rt.InferenceSession(model_path)
+with open("./model", "rb") as file:
+  model = pickle.load(file)
 
+model.eval()
 
 def preprocess(image):
-    image = cv2.resize(image, (HEIGHT, WIDTH))
-    image_array = np.array(image).astype(np.float32)
-    image_array = (image_array - MEAN) / STD_DEV
-    image_array = np.transpose(image_array, (2, 0, 1))
-    image_tensor = np.expand_dims(image_array, axis=0)
-    return image_tensor
-
+  image = cv2.resize(image, (HEIGHT, WIDTH))
+  image_array = np.array(image).astype(np.float32)
+  image_array = (image_array - MEAN) / STD_DEV
+  image_array = np.transpose(image_array, (2, 0, 1))
+  image_tensor = torch.tensor(image_array, dtype=torch.float32)
+  image_tensor = image_tensor.unsqueeze(0)
+  return image_tensor
 
 @app.route('/upload', methods=['POST'])
 def upload():
-    file = request.files['file']
-    file_bytes = np.frombuffer(file.read(), np.uint8)
-    image = preprocess(cv2.imdecode(file_bytes, cv2.IMREAD_COLOR))
+  if 'file' not in request.files:
+      return "No image found", 400
+  file = request.files['file']
+  file_bytes = np.frombuffer(file.read(), np.uint8)
+  image = preprocess(cv2.imdecode(file_bytes, cv2.IMREAD_COLOR))
 
-    input_name = session.get_inputs()[0].name
-    output_name = session.get_outputs()[0].name
-
-    output = session.run([output_name], {input_name: image})[0]
-    probabilities = output[0]
-    benign = probabilities[0]
-    malignant = probabilities[1]
-    prediction = "benign" if benign > malignant else "malignant"
-    return jsonify({"prediction": prediction, "benign": benign, "malignant": malignant})
-
+  with torch.no_grad():
+      output = model(image)
+      probabilities = F.softmax(output, dim=1)
+  benign = probabilities[0][0].item()
+  malignant = probabilities[0][1].item()
+  prediction = "benign" if benign > malignant else "malignant"
+  print(output)
+  print(f"Prediction: {prediction}, Benign Probability: {benign:.4f}, Malignant Probability: {malignant:.4f}")
+  return jsonify({"prediction": prediction, "benign": benign, "malignant": malignant})
 
 if __name__ == "__main__":
     app.run(debug=True)
