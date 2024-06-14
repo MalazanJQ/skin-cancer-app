@@ -14,7 +14,7 @@ STD_DEV = np.array([57.58242606, 53.78604796, 55.97474568])
 app = Flask(__name__)
 CORS(app)
 
-with open("./model", "rb") as file:
+with open("./model_c", "rb") as file:
   model = pickle.load(file)
 
 model.eval()
